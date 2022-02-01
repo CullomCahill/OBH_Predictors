@@ -1,0 +1,413 @@
+---
+title: "OBH paper draft"
+author: "Elements Wilderness Program Research Team"
+date: "9/19/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Potential Predictors of OBH Client Success  
+
+Analysis of adolescents attending Outdoor Behavioral Healthcare (OBH) programs which are part of the National Association of Therapeutic Schools and Programs Practice Research Network (NATSAP PRN) in the United States.  For more information visit natsap.org and obhcouncil.com.  
+
+The following is detailed explanation of a working paper to be submitted for peer review to the journal of Residential Treatment for Children & Youth.  
+
+## Objective  
+
+To determine if there are any significant predictors of adolescent client success in OBH treatment.  All clients were given the Youth Outcome Questionnaire (YOQ) at both intake and discharge, a peer reviewed measurement frequently used to assess mental health functioning in adolescents.  Finding the change between the intake and discharge scores can be used to determine if the client met the Reliable Change Index (RCI).  Previous studies have found that meeting the RCI corresponds to a clinically significant change in the individual, i.e. a behavioral and mood change that is apparent both to the individual and those in contact with the individual.  
+
+"Success" in this paper is defined as a client meeting the Reliable Change Index (RCI) when their intake and discharge scores were compared.  
+
+
+
+```{r setup, include = FALSE}
+# Removes all code from the output
+
+library(tidyverse)
+library(janitor) # For tabyl
+library(knitr) # for kable
+library(psych)
+
+knitr::opts_chunk$set(echo = FALSE)
+
+
+getwd()
+
+# Load OBH NATSAP dataset and name "obh"
+obh_org <- readRDS("C:/Users/cullo/OneDrive/Desktop/One Cloud/ELEMENTS/OBH_CF_CC/rds/obh_for_logistic.rds")
+
+
+```
+
+**To view the cleaning script for this file, please visit "OBH cleaning.R" on Github**  
+
+
+## Predictor Variable Selection (Data Description)
+
+Predictor variables used in this study were selected based on presence in other OBH studies.  
+
+* gender  
+
+* adopted  
+
+* attention_issue  
+
+* autism  
+
+* conduct_disorder  
+
+* depression  
+
+* substance_abuse  
+
+* trauma_related_issue  
+
+* program_need  
+
+* change_desire  
+
+* prior_prog  
+
+* progress_need  
+
+* Routine Monitoring Status
+
+* transport  
+
+* Rel01 intake difference z score  
+
+<br>  
+
+## YOQ Scores  
+
+Clients were given the Y-OQ survey at intake and discharge.  An individual's change score was calculated by subtracting their intake score from their discharge score.  Only individuals with self-report Y-OQ scores at admission and discharge were included.  
+
+```{r yoq intake discharge}
+
+# Remove variables that have less than 5% response rate
+obh <- obh_org %>% select(-c(bi_polar, eating_disorder, gender_dysphoria, learning_disability, ocd_disorders, personality_disorders, psychotic_disorders))
+
+# Set up table for intake, discharge and change variables
+client_yoq_des <- obh %>% select(client_YOQ_20SR_A0_SCORE, client_YOQ_20SR_D0_SCORE, delta_client) %>% 
+  rename(intake = client_YOQ_20SR_A0_SCORE,
+         discharge = client_YOQ_20SR_D0_SCORE,
+         change_score = delta_client)
+
+client_yoq_des_tab <- describe(client_yoq_des, fast = TRUE)
+client_yoq_des_tab$vars <- NULL
+
+# Round 
+client_yoq_des_tab <- client_yoq_des_tab %>% mutate_at(vars(mean, sd, se), funs(round(.,2)))
+
+# Print
+kable(client_yoq_des_tab, caption = "Table : Client YOQ Scores")
+
+# Include graphic here
+
+```
+
+<br>  
+
+## Reliable Change Index  
+
+The Reliable Change Index (RCI) is the criteria used to evaluate if a clinically significant change of behavioral and mental health improvement has occurred between initial intake and completion of an OBH program.  The RCI for the YOQ Youth Self Report is a change of 18 points while the RCI for the YOQ Parent Report is a change of 13.  The RCI provides a statistical measure to determine clinical change.  
+
+```{r RCI}
+# Create rci variable based on criteria 
+obh$rci <- ifelse(obh$delta_client <= - 18, 1, 0)
+
+# Table of RCI
+rci_tab <- obh %>% group_by(rci) %>% tally() %>% mutate(perc = round(n/2470*100,2))
+
+kable(rci_tab, caption = "Table : Reliable Change Index")
+
+```
+
+Participants in this study had consented to being part of the NATSAP PRN and had attended an Outdoor Behavioral Healthcare program between 2018 and 2021.  The mean age of the sample was 15.40 (SD = 1.32 years).  Participants included individuals with a variety of presenting problems including attention issues, Autism Spectrum Disorder, anxiety, Conduct Disorder, depression and substance abuse (see Table 1).  
+
+```{r freq_select vars}
+
+
+# New freq table with updated inputs
+freq_tabs_list1 <- lapply(obh[,c(1, 5:13, 18)], tabyl) 
+
+# Bring this list of tables together into a central table
+freq_tab_rm <- data.table::rbindlist(freq_tabs_list1, fill = TRUE, idcol=TRUE)
+
+# Tidy up
+freq_tab_rm <- freq_tab_rm %>% rename(variable = `.id`, response = `X[[i]]`) %>% 
+  mutate(percent = round(percent*100, 2)) %>% 
+  select(-valid_percent)
+
+kable(freq_tab_rm, caption = "Table 1: Participant Demographics")
+
+```
+
+In addition to collecting this demographic data, participants were asked to respond to four self report variables.  These were presented on a likert scale from 0 (least/strongly disagree) to 10 (most/strongly agree).  The following four statements from the NATSAP AQI were included in the analysis:  
+* **program_need** = “It makes sense for me to be in this therapeutic program.”   
+* **change_desire** = “I would like to make a positive change in my life.”  
+* **prior_progress** = “Prior to coming to this program, how much therapeutic progress do you believe you have made by previously engaging in therapy?”  
+* **progress_need** = “How much therapeutic progress do you believe you need to make at this current program?”  
+
+
+```{r}
+# Means of 0/1 for likert variables
+
+likert_mean_tab <- obh %>%  
+  summarise(program_need_mean = mean(program_need, na.rm = TRUE),
+            program_need_sd = sd(program_need, na.rm = TRUE),
+            change_desire_mean = mean(change_desire, na.rm = TRUE),
+            change_desire_sd = sd(change_desire, na.rm = TRUE),
+            prior_prog_mean = mean(prior_prog, na.rm = TRUE),
+            prior_prog_sd = sd(prior_prog, na.rm = TRUE),
+            progress_need_mean = mean(progress_need, na.rm = TRUE),
+            progress_need_sd = sd(progress_need, na.rm = TRUE)) %>% 
+  pivot_longer(1:8, names_to = "Variable")
+
+
+likert_mean_tab
+
+```
+
+
+## New Variable Creation  
+
+Clinicians have long wondered if the difference in intake scores between parents and their children lead to differences in program success for the adolescent.  We attempt to answer this question by creating a new variable to measure the intake difference, **intake_dif**.  Shown in Figure 1 is the *Intake distribution difference* between parents and clients.  
+
+```{r intake_dif_plot}
+# goal to overlap client_A0_z rel01_A0_z then also rel01_dif_z?
+
+intake_dif_plot <- ggplot(obh) +
+  geom_density(aes(x = client_YOQ_20SR_A0_SCORE), linetype = "dashed", size = 1) +
+  geom_density(aes(x = rel01_YOQ_201_A0_SCORE), size = 1) +
+  theme_minimal() +
+  xlab("YOQ Intake Score")+
+  labs(title = "Figure 1: Intake distribution difference", caption = "dashed = client")
+intake_dif_plot
+# Add custom legend
+```
+
+Both client and parent scores at intake were converted into z-scores to ensure like comparisons. Figure 2 illustrates these z-score distributions.  
+
+```{r intake_dif Define}
+# Convert to Z scores
+obh <- obh %>% 
+  # Client Intake:: (client_A0_z)
+  mutate(client_A0_z = (client_YOQ_20SR_A0_SCORE - mean(client_YOQ_20SR_A0_SCORE, na.rm = TRUE))/ sd(client_YOQ_20SR_A0_SCORE, na.rm=TRUE)) %>% 
+  # Parent Intake (rel01_A0_z)
+  mutate(rel01_A0_z = (rel01_YOQ_201_A0_SCORE - mean(rel01_YOQ_201_A0_SCORE, na.rm = TRUE))/ 
+           sd(rel01_YOQ_201_A0_SCORE, na.rm=TRUE)) 
+
+# Calculate difference in z scores
+## RELATIVE01 - CLIENT and REL01 - CLIENT
+obh <- obh %>% 
+  mutate(rel01_dif_z = (rel01_A0_z - client_A0_z))
+```
+
+
+```{r intake_dif_plot_2}
+z_intake_dif_plot <- ggplot(obh) +
+  geom_density(aes(x = client_A0_z), linetype = "dashed", size = 1) +
+  geom_density(aes(x = rel01_A0_z), size = 1) +
+  theme_minimal() +
+  xlab("YOQ Intake Z Score")+
+  labs(title = "Figure 2: Z Score Intake distribution difference", caption = "dashed = client") +
+  geom_vline(xintercept = 1)+
+  geom_vline(xintercept = -1)
+z_intake_dif_plot
+```
+
+Next, we subtracted the client intake z-scores from the parent intake z-scores to produce the intake difference z-score (Figure 3).  For further ease of understanding the data, the raw z-scores were broken out into three groups based on standard deviation distribution: similar scorers, high scoring clients, and high scoring parents.  Note, some values are missing as some cases are missing parent intake scores.  These are recorded as *NA*.  
+
+```{r intake_dif_plot_3}
+only_z_dif_plot <- ggplot(obh) +
+  geom_density(aes(x = rel01_dif_z), size = 1) +
+  theme_minimal() +
+  xlab("Parent - Student Z Score")+
+  labs(title = "Figure 3: Z Score Intake distribution difference", caption = "dashed = client") +
+  geom_vline(xintercept = 1, linetype = "dashed")+
+  geom_vline(xintercept = -1, linetype = "dashed")
+only_z_dif_plot
+# ADD CAPTIONS
+```
+
+```{r intake_dif z-score table}
+# Bin intake difference z scores based on standard deviations from 0
+obh <- obh %>% mutate(z_dif_levels =
+                        case_when(rel01_dif_z <= -1 ~ "stuH",  # student high
+                                  rel01_dif_z > -1 & rel01_dif_z < 1 ~ "same", # same
+                                  rel01_dif_z >= 1 ~ "parH"))   # parent high
+
+
+# Set reference level to "same" for logistic regression
+obh$z_dif_levels <- relevel(as.factor(obh$z_dif_levels), "same")
+
+# Show a table of proportions
+# zprop_tab <- obh %>% count(z_dif_levels) %>% 
+#   mutate(prop = prop.table(n)) %>% 
+#   mutate(z_dif_levels = recode(z_dif_levels, same = "Both within 1 SD", 
+#                                parH = "Parents 1 SD above", stuH = "Students 1 SD above")) %>% 
+# 
+# kable(zprop_tab)
+# Some issue here?
+```
+ 
+
+## Logistic Regression  
+
+We ran a logistic regression to determine if any of our independent feature variables collected at intake were useful in determining the success of client at discharge.  As shown in Table 5, there were 7 significant predictors of participants meeting the RCI: **gender, participant age, depression, routine outcome monitoring, prior progress, progress needed, and intake difference category**.  
+
+```{r model_D0 logistic regression}
+
+# Run logistic regression model for select variables
+obh_log <- obh %>% 
+  select(gender, age_intake, adopted:transport, z_dif_levels, rci) %>% 
+  filter(age_intake >= 13) %>% 
+  na.omit()
+
+# Removing na's brings data down to 2192 from 2418
+obh_log_model <- glm(rci ~ ., data = obh_log, family = "binomial")
+summary(obh_log_model)
+
+# Create table of logistic model
+obh_log_model_df <- as.data.frame(summary(obh_log_model)$coef)
+obh_log_model_df$oddrat <- exp(coef(obh_log_model))
+
+# Show table with rounded values
+kable(round(obh_log_model_df,3), caption = "Table x, Predictors of Clinically Significant Change")
+```
+
+## Follow up Test 
+
+A possible confounding factor to interpreting the intake difference variable as being significant to the model is if adolescents who scored higher than their parents are simply adolescents who also scored higher than the general sample at intake and that those with higher scores at intake are more likely to meet the RCI at discharge.  
+
+To account for this potential issue, cases where adolescents scored one or more standard deviations above the mean at intake were put into a subset.  From this subset, adolescents in the similar scorers and the high scoring clients categories were compared (see Table 6).  A Chi-square test of independence was run to assess if the difference in intake YOQ scores had any meaningful relationship with whether or not a client met the RCI when controlling for only high scoring clients at intake.   
+
+```{r}
+# Calculate mean and standard devieation of adolescents at intake
+intake_stu_mean <- mean(obh$client_YOQ_20SR_A0_SCORE) # 71.09
+intake_stu_df <- sd(obh$client_YOQ_20SR_A0_SCORE)   # 33.43
+
+# So to meet the cutoff of what we are trying to study, must only look at clients with scores at or above 104 (mean + 1 Sd, 71+33 = 104 = high scoring student subset)
+obh$stu_high_intake <- ifelse(obh$client_YOQ_20SR_A0_SCORE > 104, 1, 0)
+
+# Subset all highscoring students
+stu_high <- obh %>% filter(stu_high_intake == 1, z_dif_levels != "parH")
+
+# Run a Chi-squared analysis to determine if there is an significant relationship between an individual's assigned intake difference group (z_dif_levels) and program success (rci)
+chisq.test(stu_high$rci, stu_high$z_dif_levels)
+
+# Chi-squared says difference in groups is not random chance
+```
+
+
+There was a significant relationship between the two variables (X2 = 8.44, df = 1, p = .004).  This supports the finding from the logistic regression model that adolescents who scored one or more standard deviations higher than their parents were more likely to meet the RCI than adolescents who scored similarly to parents at intake.  
+
+
+## Data Visualization
+
+
+```{r }
+# Demographic object
+freq_tab_rm
+
+ggplot(freq_tab_rm, aes(variable, percent, fill = response)) + geom_bar(position = "dodge", stat = "identity")
+
+rci_tab <- freq_tab_rm  %>% filter(variable == "adopted") 
+rci_tab$rci <- ifelse(rci_tab$response == 1, 7, 48)
+rci_tab$no_rci <- ifelse(rci_tab$response == 0, 37, 8)
+
+ggplot(rci_tab) + 
+  geom_bar(aes(variable, percent, color = rci), stat= "identity") +
+  geom_bar(aes(variable, percent, fill = response), position = "dodge", stat = "identity")
+  
+
+
+
+rci2 <- obh %>%
+  group_by(rci, adopted) %>%
+  summarise(COUNT = n()) %>%
+  ungroup() %>%
+  mutate(PERCENT = COUNT/sum(COUNT)) 
+
+rci2.1 <- rci2 %>% 
+  mutate(adopted1 = recode(adopted, "0" = "not_adopted", "1" = "adopted"))
+
+str(rci2.1)
+rci2.1$rci <- as.factor(rci2.1$rci)
+
+colors <- c("grey", "blue3")
+ggplot(rci2.1) + geom_bar(aes(adopted1, PERCENT, fill = rci), stat= "identity") +
+      scale_fill_manual(values=colors)
+
+
+
+
+```
+
+
+```{r }
+# Make similar object but for RCI
+rci_list <- lapply(obh[,c(1, 5:13, 18)], tabyl) 
+
+# Bring this list of tables together into a central table
+rci_list_tab <- data.table::rbindlist(rci_list, fill = TRUE, idcol=TRUE)
+
+# Tidy up
+rci_tab <- freq_tab_rm %>% rename(variable = `.id`, response = `X[[i]]`) %>% 
+  mutate(percent = round(percent*100, 2)) %>% 
+  select(-valid_percent)
+
+
+rci_tab <- obh %>% select(gender, adopted, attention_issue, autism, anxiety, conduct_disorder, depression, substance_abuse, trauma_related_issue, rom, transport, rci) 
+
+
+
+t1 <- rci_tab %>% 
+  group_by(rci) %>% 
+  summarise(COUNT = n()) %>% 
+  ungroup() %>% 
+  mutate(PERCENT = COUNT/sum(COUNT)) %>% 
+  filter(COUNT == 1) %>% 
+  summarise(COUNT_1 = sum(PERCENT))
+
+df <- iris
+
+df2 <- df %>%
+  group_by(Species, Petal.Width) %>%
+  summarise(COUNT = n()) %>%
+  ungroup() %>%
+  mutate(PERCENT = COUNT/sum(COUNT))
+
+
+
+
+
+```
+
+
+
+
+
+## Conclusion  
+
+Overall, 54.57% of the individuals in this study experienced successful treatment gains, defined as meeting the RCI, and 45.43% did not.  Several variables proved to be meaningful predictors of clinically significant change from the logistic regression model.  Meaningful predictor variables are listed below in order of decreasing odds ratio:  
+
+* High Scoring Student - 2.45 *(compared to students who scored similar to parents)*  
+* Routine Outcome Monitoring - 2.00  
+* Depression - 1.48  
+* Age at intake - 1.14  
+* Progress Need - 1.04  
+* Prior Progress - .95  
+* Gender Male - .65 *(.65 compared to when gender is female)*  
+* High Scoring Parents - .44 *(compared to students who scored similar to parents)*  
+
+	The presence of routine outcome monitoring resulted in a case being two times as likely to meet the RCI at discharge.  Although the information is not available in the data set, this outcome could be due in part to programs who collect this data from clients utilizing it to make therapeutically informed decisions based on their client’s progress trajectory (Lambert & Harmon, 2018).  This finding could also be due to the fact that merely having clients fill out the YOQ survey of mental health functioning could result in beneficial treatment gains due to something like the Hawthorne effect, where subjects modify some aspect of their behavior in response to being observed (Allen & Davis, 2011).  
+	
+  Male participants were 35% less likely to to meet the RCI upon discharge from an OBH program.  This finding is fairly consistent in the OBH and general mental health treatment research (Tucker et al., 2014, Combs et al., 2016) and may be due to female clients rating their level of psychological distress to be higher than males at intake (DeMille et al., 2018, Combs et al., 2016, Tucker, Pau et al., 2016).  Females were also found to make psychological improvements faster than males, which could result in larger RCI differences (Combs et al., 2016).  Older adolescents were more likely to meet the RCI, for each year increase in a participant, the likelihood of them meeting the RCI increased by 13%, which is consistent with some research (Bowen & Neill, 2013).  One possible explanation is that older individuals, due to a more mature outlook on the world, are more invested in their therapeutic experience.  This data also supports the existing literature which asserts the benefits of OBH programs for adolescents experiencing depression could greatly benefit from OBH treatment.  Individuals with depression were about 1.48 times more likely than those individuals not diagnosed with depression to meet the RCI.  This finding may be understood in terms of how many aspects inherent to OBH have also been shown to be helpful to depression as well: social interaction, purpose, exercise, exposure to nature (Blake, 2012; Mygind, et al., 2019 , are these citations necessary or common knowledge?) among others.  
+
+	Of the self-report likert scale questions asked of the participants at intake, Prior Progress and Progress Needed were shown to significantly contribute to an individual meeting the RCI, but both had relatively minor effect sizes.  For every unit increase on the 0-10 scale of prior progress the odds of meeting the RCI decreased by 5% suggesting that individuals who had experienced less therapeutic progress up until the point of enrolling in an OBH program had a higher likelihood of success throughout their course of OBH treatment.  Conversely, for every unit increase in an individual’s personally assessed progress needed at intake the likelihood of them meeting the RCI at discharge increased by 5%, showing that individuals who arrive to the program more invested may be slightly more likely to experience a successful result.  Program Need and Change Desire were not found to significantly contribute to the prediction model, as has been shown in other research (Nash et al., 2021).  
+
+  The new variable defined in this study, the difference between parent and client scores at intake, was also shown to be a significant predictor in the model.  Adolescents who scored one or more standard deviation lower than their parents at intake were less than half as likely to meet the RCI than those who had scored within one standard deviation.  Alternatively, adolescents who scored one or more standard deviations above their parents were 2.45 times more likely to meet the RCI than those who had scored within one standard deviation of parents.  When controlling for high scoring adolescents, the difference in likelihood of meeting the RCI remained between adolescents who scored higher than parents and those who scored similarly.  One possible explanation could be that high levels of disagreement between parents and adolescents have an impact on if an adolescent meets the RCI.  Specifically, if adolescents judge their issues to be much less acute than their parents do, they may have a harder time seeing the reality of their situation and thus be less likely to engage in therapy.  Further, if adolescents judge their issues to be more extreme than their parents, they may be more likely to work harder while in the program.  
+

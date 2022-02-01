@@ -1,0 +1,622 @@
+---
+title: "OBH paper draft"
+author: "Elements Wilderness Program Research Team"
+date: "9/19/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+
+
+
+## Data Setup  
+
+```{r setup, include = FALSE}
+# Removes all code from the output
+
+library(tidyverse)
+library(janitor) # For tabyl
+library(knitr) # for kable
+
+knitr::opts_chunk$set(echo = FALSE)
+
+# Load OBH NATSAP dataset and name "obh"
+obh <- readRDS("C:/Users/applesaint/Desktop/One Cloud/ELEMENTS/OBH_CF_CC/rds/obh_for_logistic.rds")
+
+
+```
+
+**To view the cleaning script for this file, please visit "OBH cleaning.R" on Github**
+
+
+# Frequency tables  
+
+<br>
+
+
+## Intake Diff Hist
+
+```{r z_dif setup}
+
+# from obh$rel01_dif_z
+
+obh <- obh %>% mutate(z_dif_cat = 
+                        case_when(rel01_dif_z <= -1 ~ -1,  # student high
+                                  rel01_dif_z > -1 & rel01_dif_z < 1 ~ 0, # same
+                                  rel01_dif_z >= 1 ~ 1))   # parent high
+
+# Code this variable non-numerically as well
+obh <- obh %>% mutate(z_dif_levels = 
+                        case_when(rel01_dif_z <= -1 ~ "stuH",  # student high
+                                  rel01_dif_z > -1 & rel01_dif_z < 1 ~ "same", # same
+                                  rel01_dif_z >= 1 ~ "parH"))   # parent high
+
+obh$z_dif_levels <- relevel(as.factor(obh$z_dif_levels), "same")
+
+
+```
+
+
+```{r Introduce Intake Difference}
+## Define INTAKE DIFFERENCE----
+# Convert client and parent intake scores to z-scores and find the difference
+# to understand if disagreement of severity of problem impacts program success
+
+# Convert to Z scores
+obh <- obh %>% 
+  # Client Intake:: (client_A0_z)
+  mutate(client_A0_z = (client_YOQ_20SR_A0_SCORE - mean(client_YOQ_20SR_A0_SCORE, na.rm = TRUE))/ 
+           sd(client_YOQ_20SR_A0_SCORE, na.rm=TRUE)) %>% 
+  # Parent Intake (rel01_A0_z)
+  mutate(rel01_A0_z = (rel01_YOQ_201_A0_SCORE - mean(rel01_YOQ_201_A0_SCORE, na.rm = TRUE))/ 
+           sd(rel01_YOQ_201_A0_SCORE, na.rm=TRUE)) 
+# Calculate difference in z scores
+## RELATIVE01 - CLIENT and REL01 - CLIENT
+obh <- obh %>% 
+  mutate(rel01_dif_z = (rel01_A0_z - client_A0_z))
+
+# Bin intake difference z scores based on standard deviations from 0
+obh <- obh %>% mutate(z_dif_cat = 
+                        case_when(rel01_dif_z <= -1 ~ -1,  # student high
+                                  rel01_dif_z > -1 & rel01_dif_z < 1 ~ 0, # same
+                                  rel01_dif_z >= 1 ~ 1), # parent high
+                      z_dif_levels =
+                        case_when(rel01_dif_z <= -1 ~ "stuH",  # student high
+                                  rel01_dif_z > -1 & rel01_dif_z < 1 ~ "same", # same
+                                  rel01_dif_z >= 1 ~ "parH"))   # parent high
+# Set reference level to "same" for regression
+obh$z_dif_levels <- relevel(as.factor(obh$z_dif_levels), "same")
+```
+
+
+
+
+
+
+```{r}
+# goal to overlap client_A0_z rel01_A0_z then also rel01_dif_z?
+
+intake_dif_plot <- ggplot(obh) +
+  geom_density(aes(x = client_YOQ_20SR_A0_SCORE), linetype = "dashed", size = 1) +
+  geom_density(aes(x = rel01_YOQ_201_A0_SCORE), size = 1) +
+  theme_minimal() +
+  xlab("YOQ Intake Score")+
+  labs(title = "Intake distribution difference", caption = "dashed = client")
+
+
+z_intake_dif_plot <- ggplot(obh) +
+  geom_density(aes(x = client_A0_z), linetype = "dashed", size = 1) +
+  geom_density(aes(x = rel01_A0_z), size = 1) +
+  theme_minimal() +
+  xlab("YOQ Intake Z Score")+
+  labs(title = "Z Score Intake distribution difference", caption = "dashed = client") +
+  geom_vline(xintercept = 1)+
+  geom_vline(xintercept = -1)
+
+
+# ggsave("C:/Users/applesaint/Desktop/One Cloud/ELEMENTS/OBH_CF_CC/fig/intake difference plot.jpg", intake_dif_plot, width = 10, height = 7)
+# ggsave("C:/Users/applesaint/Desktop/One Cloud/ELEMENTS/OBH_CF_CC/fig/z score intake difference plot.jpg", z_intake_dif_plot, width = 10, height = 7)
+# 
+
+
+only_z_dif_plot <- ggplot(obh) +
+  geom_density(aes(x = rel01_dif_z), size = 1) +
+  theme_minimal() +
+  xlab("Parent - Student Z Score")+
+  labs(title = "Z Score Intake distribution difference", caption = "dashed = client") +
+  geom_vline(xintercept = 1, linetype = "dashed")+
+  geom_vline(xintercept = -1, linetype = "dashed")
+
+
+# ggsave("C:/Users/applesaint/Desktop/One Cloud/ELEMENTS/OBH_CF_CC/fig/only z difference plot.jpg", only_z_dif_plot, width = 10, height = 7)
+
+obh %>% group_by(z_dif_cat) %>% tally()
+# 379 missing
+
+colSums(is.na(obh))
+
+```
+
+
+
+
+<br>
+
+
+
+## Change Category formula
+
+REPHRASE
+These groupings are based on a combination of a client’s discharge score as well as whether or not they met the RCI (see Table 2).  As outlined in this table, clients who met the RCI fall into either the Recovered or Improved category.
+
+
+
+## Change category frequency  
+```{r change_cat_tab}
+
+
+# Set up frequency table of clinical change categories
+change_cat_tab <- obh %>% group_by(change_cat_client) %>% tally() %>% 
+  mutate(change_cat_client = recode(change_cat_client, rec = "recovered", imp = "improved",
+                                    unch = "unchanged", nocl = "non_clinical", det = "deteriorated")) %>% 
+  mutate(perc = round(n/2470*100,2))
+
+
+kable(change_cat_tab)
+
+```
+For the purpose of this study, we are going to dummy code an RCI variable
+
+
+
+
+
+
+
+
+## Means and multi-response tables:  
+age, clinical change category, program_need, change_desire, prior_prog, progress_need, intake_difference
+```{r means and multi_response tabs}
+
+tab1 <- data.frame("var" = c("age_intake", "program_need", 
+                             "change_desire", "prior_prog", "progress_need"),
+                   "mean" = c(mean(obh$age_intake), 
+                              mean(obh$program_need, na.rm = TRUE), 
+                              mean(obh$change_desire, na.rm = TRUE),
+                              mean(obh$prior_prog, na.rm = TRUE), 
+                              mean(obh$progress_need, na.rm = TRUE)),
+                   "sd" = c(sd(obh$age_intake), 
+                              sd(obh$program_need, na.rm = TRUE), 
+                              sd(obh$change_desire, na.rm = TRUE),
+                              sd(obh$prior_prog, na.rm = TRUE), 
+                              sd(obh$progress_need, na.rm = TRUE)),
+                   "n" = c(sum(!is.na(obh$age_intake)),
+                           sum(!is.na(obh$program_need)),
+                           sum(!is.na(obh$change_desire)),
+                           sum(!is.na(obh$prior_prog)),
+                           sum(!is.na(obh$progress_need))
+                           ))
+
+
+
+kable(tab1)
+
+
+```
+
+## Descriptive Stats on YOQ Scores  
+
+```{r yoq means}
+yoq_mean <- data.frame("var" = c("client_intake", "rel01_intake", "client_discharge", "client_change"),
+                   "mean" = c(mean(obh$client_YOQ_20SR_A0_SCORE), 
+                              mean(obh$rel01_YOQ_201_A0_SCORE, na.rm = TRUE), 
+                              mean(obh$client_YOQ_20SR_D0_SCORE, na.rm = TRUE),
+                              mean(obh$delta_client, na.rm = TRUE)),
+                   "sd" = c(sd(obh$client_YOQ_20SR_A0_SCORE), 
+                              sd(obh$rel01_YOQ_201_A0_SCORE, na.rm = TRUE), 
+                              sd(obh$client_YOQ_20SR_D0_SCORE, na.rm = TRUE),
+                              sd(obh$delta_client, na.rm = TRUE)),
+                   "n" = c(sum(!is.na(obh$client_YOQ_20SR_A0_SCORE)),
+                           sum(!is.na(obh$rel01_YOQ_201_A0_SCORE)),
+                           sum(!is.na(obh$client_YOQ_20SR_D0_SCORE)),
+                           sum(!is.na(obh$delta_client))
+                           ))
+
+kable(yoq_mean)
+```
+
+
+Variables under consideration:  
+
+* gender  
+
+* adopted  
+
+* attention_issue  
+
+* autism  
+
+* conduct_disorder  
+
+* depression  
+
+* substance_abuse  
+
+* trauma_related_issue  
+
+* program_need  
+
+* change_desire  
+
+* prior_prog  
+
+* progress_need  
+
+* Routine Monitoring Status
+
+* transport  
+
+* Rel01 intake difference z score  
+
+
+
+
+# Chi-Squared on groups 
+
+Do we want to run this with our dummy variable or full clinical change categories?   
+Think we'll want to run rci because that will be what we are feeding into the logistic regression
+
+```{r chisq}
+# dummy code intake difference score
+# obh$change_cat_1sd <- ifelse(obh$rel01_dif_cat == 3, 1, 0)
+
+
+
+
+# Subset just tested variables
+obh_sel <- obh %>% select(rci, gender, adopted, attention_issue, autism, conduct_disorder, depression, substance_abuse, trauma_related_issue, rom, program_need, change_desire, prior_prog, progress_need, transport, z_dif_cat)
+
+
+
+combos <- combn(ncol(obh_sel),2)
+# Only want 1:13 ie. combos with rci
+combos <- combos[,1:15]
+x2_test <- plyr::adply(combos, 2, function(x) {
+  test <- chisq.test(obh_sel[, x[1]], obh_sel[, x[2]])
+
+  out <- data.frame("Row" = colnames(obh_sel)[x[1]]
+                    , "Column" = colnames(obh_sel[x[2]])
+                    , "Chi.Square" = round(test$statistic,3)
+                    ,  "df"= test$parameter
+                    ,  "p.value" = round(test$p.value, 3)
+                    )
+  return(out)
+
+})  
+
+
+
+kable(x2_test)
+
+```
+
+
+Separate chi-squared tests showed a number of variables having significant impact on the program having a positive impact on a student or not: gender, attention_issue, autism, depression, program_need, progress_need and transport.  *Will include all these numbers in paper, but here are significant variables:*  
+
+```{r chi freq tab}
+
+obh_sel1 <- obh_sel %>% select(-c(program_need, change_desire, prior_prog, progress_need))
+obh_long <- gather(obh_sel1, key = "variable", value = "response", c(2:12))
+
+
+table(obh$rci)
+# 0 = 1122, 1 = 1348
+
+
+# Put all into one table
+x2_des <- obh_long %>% 
+  group_by(variable, response, rci) %>% tally() %>%
+  pivot_wider(names_from = rci, values_from = n) %>% 
+  na.omit() %>% 
+  rename(no_rci = `0`, rci = `1`)
+
+# Add total
+x2_des$total <- x2_des$no_rci + x2_des$rci
+
+# Add precent meet rci
+x2_des$perc_met_rci <- round(x2_des$rci/x2_des$total *100, 2)
+
+
+
+kable(x2_des)
+
+
+## Merge chi-squared test (x2_test) to this
+
+x2_test <- x2_test %>% select(-c(Row, X1))
+
+chi_sq_merge <- merge(x2_des, x2_test, by.x = "variable", by.y = "Column")
+
+
+
+
+## Save both these as csv files
+# Not sure why having to use absolute path here, keeps changing to /script otherwise...
+# write.csv(x2_des, "C:/Users/applesaint/Desktop/One Cloud/ELEMENTS/OBH_CF_CC/output/x2_description_table.csv")
+# write.csv(x2_test, "C:/Users/applesaint/Desktop/One Cloud/ELEMENTS/OBH_CF_CC/output/x2 test table.csv")
+# write.csv(chi_sq_merge, "C:/Users/applesaint/Desktop/One Cloud/ELEMENTS/OBH_CF_CC/output/chi_sq results.csv")
+
+
+
+
+```
+
+
+
+
+
+
+
+```{r z difference table}
+
+z_dif_tab <- obh %>% group_by(z_dif_cat, rci) %>% tally()
+
+kable(z_dif_tab)
+
+# Or just give mean difference z score based on rci
+
+t1 <- obh %>% group_by(rci) %>% summarise(mean = mean(rel01_dif_z, na.rm=TRUE),
+                                          sd = sd(rel01_dif_z, na.rm=TRUE))
+
+
+
+
+```
+
+
+
+
+# D0 Predictor Regression
+
+```{r model_D0 logistic regression}
+
+# Run model again with those select variables
+obh_d0 <- obh %>% 
+  select(gender, age_intake, adopted:transport, z_dif_levels, rci) %>% 
+  filter(age_intake >= 13) %>% 
+  na.omit()
+
+# Removing na's brings data down to 2192 from 2418
+model_D0 <- glm(rci ~ ., data = obh_d0, family = "binomial")
+summary(model_D0)
+
+model_D0_df <- as.data.frame(summary(model_D0)$coef)
+
+model_D0_df$oddrat <- exp(coef(model_D0))
+
+
+#(646 observations deleted due to missingness)
+
+## Check for multicollinearity in model
+
+# Correlation in all variables in our dataset
+
+regclass::VIF(model_D0)
+
+
+# write.csv(model_D0_df, file="C:/Users/applesaint/Desktop/One Cloud/ELEMENTS/OBH_CF_CC/output/model_D0 Regression results.csv")
+
+```
+
+
+
+```{r D0 psuedo r^2}
+## Calculate McFadden's psuedo R^2
+
+## Now calculate the overall "Pseudo R-squared" and its p-value
+model_D0_null <- model_D0$null.deviance/-2
+model_D0_proposed <- model_D0$deviance/-2
+
+## McFadden's Pseudo R^2 = [ LL(Null) - LL(Proposed) ] / LL(Null)
+(model_D0_null - model_D0_proposed) / model_D0_null  
+# .10, not great?
+
+## The p-value for the R^2
+1 - pchisq(2*(model_D0_proposed - model_D0_null), df=(length(model_D0$coefficients)-1))
+# p-val very small
+```
+
+
+```{r D0 pass/fail regression}
+## now we can plot the data
+pred_d0 <- data.frame(rci_prob=model_D0$fitted.values, # sets the fitted vals to new column
+                            rci=obh_d0$rci) # takes recovered value from original df and adds to this df
+pred_d0 <- pred_d0[order(pred_d0$rci_prob, decreasing=FALSE),] # Probabilty order from low to high
+
+pred_d0$rank <- 1:nrow(pred_d0) # calls row number to new column = "rank"
+
+ggplot(data=pred_d0, aes(x=rank, y=rci_prob)) +
+  geom_point(aes(color=rci), alpha=1, shape=4, stroke=2) +
+  xlab("Index") +
+  ylab("Predicted probability of Recovery")
+
+
+pred_d0$pred_rci <- ifelse(pred_d0$rci_prob > .6, "1_pred", "0_pred") 
+table(pred_d0$pred_rci, pred_d0$rci)
+
+
+
+
+```
+
+
+
+# D180 Predictor Regression
+
+
+```{r model_D180 regression}
+# Set up d180 dummy var if client has data at 6 months also
+
+obh$d180 <- ifelse(!is.na(obh$client_YOQ_20SR_D180_SCORE), 1, 0)
+
+# 
+# Set up rci_d180 to give a rci for the discharge to 180 score
+obh$rci_d180 <- ifelse(obh$delta_client_mo6 <= -18, 1, 0)
+
+# Check to make sure all is working correctly
+# t2 <- obh %>% select(d180, client_YOQ_20SR_D180_SCORE, client_YOQ_20SR_A0_SCORE, delta_client_mo6, rci_d180, rci)
+
+# Run model again with those select variables
+obh_d180 <- obh %>% 
+  filter(d180 == 1) %>% 
+  select(gender, age_intake, adopted:transport, z_dif_levels, rci_d180) %>% 
+  filter(age_intake >= 13) %>% 
+  na.omit()
+
+# Removing na's brings data down to 2192 from 2418
+model_D180 <- glm(rci_d180 ~ ., data = obh_d180, family = "binomial")
+summary(model_D180)
+
+
+
+
+## Check for multicollinearity in model
+
+# Correlation in all variables in our dataset
+
+regclass::VIF(model_D180)
+
+# write.csv(as.data.frame(summary(model_D180)$coef), file="C:/Users/applesaint/Desktop/One Cloud/ELEMENTS/OBH_CF_CC/output/model_D180 Regression results.csv")
+
+
+
+```
+
+
+
+```{r D180 psuedo r^2}
+
+## Calculate McFadden's psuedo R^2
+
+## Now calculate the overall "Pseudo R-squared" and its p-value
+model_D180_null <- model_D180$null.deviance/-2
+model_D180_proposed <- model_D180$deviance/-2
+
+## McFadden's Pseudo R^2 = [ LL(Null) - LL(Proposed) ] / LL(Null)
+(model_D180_null - model_D180_proposed) / model_D180_null  
+# .17, not great?
+
+## The p-value for the R^2
+1 - pchisq(2*(model_D180_proposed - model_D180_null), df=(length(model_D180$coefficients)-1))
+# p-val very small
+
+
+
+
+
+```
+```{r D180 pass/fail regression}
+## now we can plot the data
+pred_d180 <- data.frame(rci_prob=model_D180$fitted.values, # sets the fitted vals to new column
+                            rci=obh_d180$rci) # takes recovered value from original df and adds to this df
+pred_d180 <- pred_d0[order(pred_d180$rci_prob, decreasing=FALSE),] # Probabilty order from low to high
+
+pred_d180$rank <- 1:nrow(pred_d180) # calls row number to new column = "rank"
+
+ggplot(data=pred_d180, aes(x=rank, y=rci_prob)) +
+  geom_point(aes(color=rci), alpha=1, shape=4, stroke=2) +
+  xlab("Index") +
+  ylab("Predicted probability of Recovery")
+
+
+pred_d180$pred_rci <- ifelse(pred_d180$rci_prob > .6, "1_pred", "0_pred") 
+table(pred_d180$pred_rci, pred_d180$rci)
+
+
+
+
+```
+
+
+
+
+
+# t-tests
+```{r t-tests}
+# differences in discharge vs 6 months score
+ttest1 <- t.test(df5$client_YOQ_20SR_D0_SCORE, df5$client_YOQ_20SR_D180_SCORE, paired = TRUE)
+
+# Differnece in parent01 and studnet scores at intake
+ttest2 <- t.test(df5$client_YOQ_20SR_A0_SCORE, df5$rel01_YOQ_201_A0_SCORE, paired = TRUE)
+
+
+## differences in delta scores
+ttest3 <- t.test(df5$delta_client, df5$delta_client_mo6, paired = TRUE)
+# there is no significant difference between the change scores at discharge and the change scores at 6 months
+
+```
+
+1. No significant in YOQ scores when measured at discharge and at 6 months post discharge:  
+```ttest1```  
+2. There is a significant difference in YOQ scores of adolescents and parents at intake:
+```ttest2```
+
+3.  There is no significant difference between the change scores at discharge and the change scores at 6 months (also ran logistic on improved (55, 13%) vs deteriorated (34, 8%) at 6 months and saw no significant predictors, but don't know if we want to report that)
+```ttest3``` 
+
+# Hypothesis 3: DOA-DOD vs DOA-MO6
+```{r}
+table(obh$rci_mo6, obh$rci)
+
+obh %>% group_by(rci, rci_mo6) %>% tally()
+
+
+# Run chi-squared?
+
+chisq.test(obh$rci, obh$rci_mo6)
+
+# Shows that this is a statistical difference between those with RCI at DOA and those with RCI at MO6
+# Thus we cannot deuce the same things are happening with those folks
+
+# Or make another variables same_at_mo6
+obh$same_rci_mo6 <- ifelse(obh$rci == obh$rci_mo6, 1, 0)
+table(obh$same_rci_mo6)
+
+
+```
+
+
+# Test Stu_high 
+
+```{r}
+obh$z_dif_levels
+
+# Want to compare all in stuH (or, rather, only those that are about 1 sd from mean of total scores)
+
+mean(obh$client_YOQ_20SR_A0_SCORE) # 71.09
+sd(obh$client_YOQ_20SR_A0_SCORE)   # 33.43
+
+# So to meet the cutoff of what we are trying to study, must only look at clients with scores at or above 104
+
+obh$stu_high_intake <- ifelse(obh$client_YOQ_20SR_A0_SCORE > 104, 1, 0)
+
+table(obh$stu_high_intake, obh$z_dif_levels)
+# In these different groups, 145 of "same" are high at intake, and 204 of "stuH" are high at intake
+
+stu_high <- obh %>% filter(stu_high_intake == 1, z_dif_levels != "parH")
+
+
+tab_stu <- table(stu_high$rci, stu_high$z_dif_levels)
+
+chisq.test(stu_high$rci, stu_high$z_dif_levels)
+
+# Chi-squared says there is somthing going on between this group more than just random chance
+```
+
+
+
+
+
+
+
