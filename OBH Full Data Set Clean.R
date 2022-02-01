@@ -19,7 +19,7 @@ org_obh <- read.csv("OBH_CF_CC/data/Wilderness Data Only for Elements 6.3.21.csv
 
 sub_obh <- org_obh %>% 
   # Rename first column
-  rename(ep01_gender = `ï..ep01_gender`) %>% 
+  rename(ep01_gender = `?..ep01_gender`) %>% 
   # Select only needed information
   select(# Demotraphic data
     ep01_gender:ep01_rel02_relationship, 
@@ -183,31 +183,6 @@ obh$change_cat_client <- factor(obh$change_cat_client,
                                 levels = c("rec", "imp", "unch", "nocl", "det"))
 
 
-
-
-
-### LIKERT SCALE CONVERSION -----
-
-### Likert Scale Conversion:: program_need, change_desire, prior_prog, progress_need
-# Convert program_need likert to low, med, high (1,2,3)
-
-obh <- obh %>% 
-  # program_need
-  mutate(program_need_bin = case_when(program_need <= 3 ~ 1,
-                                      program_need >= 4 & program_need <= 6 ~ 2,
-                                      program_need >= 7 ~ 3)) %>% 
-  # change_desire
-  mutate(change_desire_bin = case_when(change_desire <= 3 ~ 1,
-                                       change_desire >= 4 & change_desire <= 6 ~ 2,
-                                       change_desire >= 7 ~ 3)) %>% 
-  # prior_prog
-  mutate(prior_prog_bin = case_when(prior_prog <= 3 ~ 1,
-                                    prior_prog >= 4 & prior_prog <= 6 ~ 2,
-                                    prior_prog >= 7 ~ 3)) %>% 
-  # progress_need
-  mutate(progress_need_bin = case_when(progress_need <= 3 ~ 1,
-                                       progress_need >= 4 & progress_need <= 6 ~ 2,
-                                       progress_need >= 7 ~ 3))
 
 
 

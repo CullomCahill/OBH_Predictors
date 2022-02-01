@@ -3,8 +3,8 @@ title: "OBH paper draft"
 author: "Elements Wilderness Program Research Team"
 date: "9/19/2021"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 # Potential Predictors of OBH Client Success  
@@ -21,7 +21,7 @@ To determine if there are any significant predictors of adolescent client succes
 
 
 
-```{r setup, include = FALSE}
+```{r setup}
 # Removes all code from the output
 
 library(tidyverse)
@@ -43,40 +43,25 @@ obh_org <- readRDS("C:/Users/cullo/OneDrive/Desktop/One Cloud/ELEMENTS/OBH_CF_CC
 **To view the cleaning script for this file, please visit "OBH cleaning.R" on Github**  
 
 
-## Predictor Variable Selection (Data Description)
+## Predictor Variable Selection
 
 Predictor variables used in this study were selected based on presence in other OBH studies.  
 
 * gender  
-
 * adopted  
-
 * attention_issue  
-
 * autism  
-
 * conduct_disorder  
-
 * depression  
-
 * substance_abuse  
-
 * trauma_related_issue  
-
 * program_need  
-
 * change_desire  
-
 * prior_prog  
-
 * progress_need  
-
 * Routine Monitoring Status
-
 * transport  
-
 * Rel01 intake difference z score  
-
 <br>  
 
 ## YOQ Scores  
@@ -304,87 +289,6 @@ chisq.test(stu_high$rci, stu_high$z_dif_levels)
 
 There was a significant relationship between the two variables (X2 = 8.44, df = 1, p = .004).  This supports the finding from the logistic regression model that adolescents who scored one or more standard deviations higher than their parents were more likely to meet the RCI than adolescents who scored similarly to parents at intake.  
 
-
-## Data Visualization
-
-
-```{r }
-# Demographic object
-freq_tab_rm
-
-ggplot(freq_tab_rm, aes(variable, percent, fill = response)) + geom_bar(position = "dodge", stat = "identity")
-
-rci_tab <- freq_tab_rm  %>% filter(variable == "adopted") 
-rci_tab$rci <- ifelse(rci_tab$response == 1, 7, 48)
-rci_tab$no_rci <- ifelse(rci_tab$response == 0, 37, 8)
-
-ggplot(rci_tab) + 
-  geom_bar(aes(variable, percent, color = rci), stat= "identity") +
-  geom_bar(aes(variable, percent, fill = response), position = "dodge", stat = "identity")
-  
-
-
-
-rci2 <- obh %>%
-  group_by(rci, adopted) %>%
-  summarise(COUNT = n()) %>%
-  ungroup() %>%
-  mutate(PERCENT = COUNT/sum(COUNT)) 
-
-rci2.1 <- rci2 %>% 
-  mutate(adopted1 = recode(adopted, "0" = "not_adopted", "1" = "adopted"))
-
-str(rci2.1)
-rci2.1$rci <- as.factor(rci2.1$rci)
-
-colors <- c("grey", "blue3")
-ggplot(rci2.1) + geom_bar(aes(adopted1, PERCENT, fill = rci), stat= "identity") +
-      scale_fill_manual(values=colors)
-
-
-
-
-```
-
-
-```{r }
-# Make similar object but for RCI
-rci_list <- lapply(obh[,c(1, 5:13, 18)], tabyl) 
-
-# Bring this list of tables together into a central table
-rci_list_tab <- data.table::rbindlist(rci_list, fill = TRUE, idcol=TRUE)
-
-# Tidy up
-rci_tab <- freq_tab_rm %>% rename(variable = `.id`, response = `X[[i]]`) %>% 
-  mutate(percent = round(percent*100, 2)) %>% 
-  select(-valid_percent)
-
-
-rci_tab <- obh %>% select(gender, adopted, attention_issue, autism, anxiety, conduct_disorder, depression, substance_abuse, trauma_related_issue, rom, transport, rci) 
-
-
-
-t1 <- rci_tab %>% 
-  group_by(rci) %>% 
-  summarise(COUNT = n()) %>% 
-  ungroup() %>% 
-  mutate(PERCENT = COUNT/sum(COUNT)) %>% 
-  filter(COUNT == 1) %>% 
-  summarise(COUNT_1 = sum(PERCENT))
-
-df <- iris
-
-df2 <- df %>%
-  group_by(Species, Petal.Width) %>%
-  summarise(COUNT = n()) %>%
-  ungroup() %>%
-  mutate(PERCENT = COUNT/sum(COUNT))
-
-
-
-
-
-```
 
 
 
