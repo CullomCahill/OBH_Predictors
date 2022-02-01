@@ -3,7 +3,11 @@ Predictors at intake of OBH client Success using logistic regression
 
 Analysis of adolescents attending Outdoor Behavioral Healthcare (OBH) programs which are part of the National Association of Therapeutic Schools and Programs Practice Research Network (NATSAP PRN) in the United States.  For more information visit natsap.org and obhcouncil.com.  
 
-The most significant and actionable finding from this research was the impact Routine Outcome Monitoring (ROM) had on client's scores.  ROM is defined as routinelty administarating mental health assessements to individuals.  **Inidividuals who had ROM data present had a 12% higher probability of reaching the bench marks for program success (66.67% for rom vs 54.57% of overall sample).**  It was not recorded if this information was utalized in a client's session of if just merely administrating the assessment accounted for the difference.   
+The most significant and actionable finding from this research was the impact Routine Outcome Monitoring (ROM) had on client's scores.  ROM is defined as routinelty administarating mental health assessements to individuals.  
+
+**Inidividuals with Routine Outcome Monitoring data available expereinced a 12% higher probability of reaching the bench marks for program success (66.67% for ROM vs. 54.57% of overall sample).**  
+
+It was not recorded if this information was utalized in a client's session of if just merely administrating the assessment accounted for the difference.   
 
 The following is detailed explanation of a working paper to be submitted for peer review to the journal of Residential Treatment for Children & Youth.  
 
