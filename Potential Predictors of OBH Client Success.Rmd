@@ -245,6 +245,10 @@ We ran a logistic regression to determine if any of our independent feature vari
 
 ```{r model_D0 logistic regression}
 
+## Save RDS for use in Logistic regression example script
+saveRDS(obh, "C:/Users/cullo/OneDrive/Desktop/One Cloud/Resume 2022/Github Portfolio/rds/obh_logit_ex.rds")
+
+getwd()
 # Run logistic regression model for select variables
 obh_log <- obh %>% 
   select(gender, age_intake, adopted:transport, z_dif_levels, rci) %>% 
